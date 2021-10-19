@@ -1,0 +1,97 @@
+#!/bin/sh
+# -*- coding: utf-8 -*-
+# shellcheck disable=SC2006,SC2004
+
+##
+## @(#) worker script of 'reraise'
+##
+## This script is intended to be invoked from `reraise` command.
+## Don't invoke this script directly.
+##
+## Usage: auto-reraise <service>
+##
+## (Requires: $RERAISE_DIR, $RERAISE_PIDDIR)
+##
+
+set -eu
+
+abort() { echo "ERROR (auto-reraise) ${1}" 1>&2; exit 1; }
+
+## directories exist?
+[ -n "${RERAISE_DIR:-}" ]    || abort "\$RERAISE_DIR not set."
+[ -n "${RERAISE_PIDDIR:-}" ] || abort "\$RERAISE_PIDDIR not set."
+
+## validation
+[ -n "${1:-}" ] || abort "service name required."
+service="$1"
+script="$RERAISE_DIR/$service"
+pidfile="$RERAISE_PIDDIR/$service"
+[ -f "$script" ] || abort "$service: script not found under '$RERAISE_DIR'."
+
+## check write permission
+echo "" > "$pidfile" || abort "$pidfile: cannot create PID file."
+/bin/rm "$pidfile" || abort "$pidfile: cannot remove PID file."
+
+## ref: https://stackoverflow.com/questions/81520/
+pid=""
+trap '
+  if [ -n "$pid" ]; then
+    kill -TERM "$pid"       || true
+    wait "$pid" 2>/dev/null || true
+  fi
+  grep ^ERROR "$pidfile" >/dev/null 2>&1 || /bin/rm -f "$pidfile"
+' 0 HUP                  # HUP is for restarting service process
+trap 'exit'   TERM       # not necessary in bash but necessary in sh
+trap 'exit 1' INT QUIT   # not work. why?
+
+## `date` command is different between Linux and BSD
+if ( date --help | grep GNU ) >/dev/null 2>&1; then
+  datecmd="date -d"               # Linux
+else
+  datecmd="date -j -f %c"         # BSD, macOS
+  #datecmd="date -j -f '%c'"      # error
+fi
+
+## main loop
+worker_pid=$$
+interval=0
+n=0            # how many times service process started successfully?
+i=0            # number of retry times
+while : ; do
+  unset config_startsecs
+  unset config_max_retry
+  eval "`grep ^config_ \"$script\"`"
+  startsecs=${config_startsecs:-10}
+  max_retry=${config_max_retry:-2}
+  #
+  start_epoch=`date +'%s'`
+  echo "START - - $worker_pid $start_epoch" > "$pidfile"
+  eval exec "$script" &
+  pid=$!
+  #
+  datestr=`ps -A -o pid,lstart | sed -n "/^ *$pid /s///p" | sed 's/ *$//'`
+  [ -z "$datestr" ] || start_epoch=`$datecmd "$datestr" +'%s'`
+  echo "RUN - $pid $worker_pid $start_epoch" > "$pidfile"
+  #
+  set +e       # necessary; don't delete this line
+  wait "$pid"
+  exitcode=$?
+  set -e       # necessary; don't delete this line
+  pid=""
+  #
+  end_epoch=`date +"%s"`
+  sec=$(( $end_epoch - $start_epoch ))
+  if [ "$sec" -ge "$startsecs" ]; then
+    echo "STOP $exitcode - $worker_pid $end_epoch" > "$pidfile"
+    i=0
+    n=$(( $n + 1 ))
+    sleep "$interval"
+  elif [ "$n" -ge 1 ] && [ "$i" -lt "$max_retry" ]; then
+    echo "STOP $exitcode - $worker_pid $end_epoch" > "$pidfile"
+    sleep $(( $interval + 2 * i ))
+    i=$(( $i + 1 ))
+  elif [ "$exitcode" -ne 0 ]; then
+    echo "ERROR $exitcode - - $end_epoch" > "$pidfile"
+    abort "$service: failed to start service process (exitcode: $exitcode, retry: $i)"
+  fi
+done

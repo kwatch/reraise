@@ -1,0 +1,352 @@
+#!/bin/sh
+# -*- coding: utf-8 -*-
+# shellcheck disable=SC3043,SC2006,SC2004
+
+##
+## @(#) start/stop service processs
+##
+## Try `reraise --help` for details.
+##
+## (Requires: `ps` and `sudo` commands)
+##
+
+[ -n "${RERAISE_DIR:-}"    ] || export RERAISE_DIR="reraise.d"
+[ -n "${RERAISE_PIDDIR:-}" ] || export RERAISE_PIDDIR="/var/run/reraise"
+
+set -eu
+
+# shellcheck disable=SC2016,SC2086
+RELEASE=`(x='$Release: 0.0.0 $'; set -- $x; echo $2)`
+
+
+##
+## helpers
+##
+
+error() {
+  echo "ERROR (reraise): ${1}" 1>&2
+}
+
+abort() {
+  [ -z "${1:-}" ] || error "$1"
+  exit 1
+}
+
+report() {
+  echo "$1"
+}
+
+checkdirs() {
+  [ -e "$RERAISE_DIR" ] || abort "$RERAISE_DIR: directory not exist. (\$RERAISE_DIR)"
+  [ -d "$RERAISE_DIR" ] || abort "$RERAISE_DIR: not a directory. (\$RERAISE_DIR)"
+  [ -e "$RERAISE_PIDDIR" ] || abort "$RERAISE_PIDDIR: directory not exist. (\$RERAISE_PIDDIR)"
+  [ -d "$RERAISE_PIDDIR" ] || abort "$RERAISE_PIDDIR: not a directory. (\$RERAISE_PIDDIR)"
+}
+
+start_worker() {
+  local service script user group
+  service=$1
+  script="$RERAISE_DIR/$service"
+  # shellcheck disable=SC2046
+  set -- `/bin/ls -l "$script"`
+  user="$3"; group="$4"
+  if [ "`id -un`" = "$user" ] && [ "`id -gn`" = "$group" ]; then
+    auto-reraise "$service" &
+    #setsid auto-reraise "$service" &     # linux ok, bsd not ok
+    #exec auto-reraise "$service" &
+  else
+    sudo -u "$user" -g "$group" auto-reraise "$service" &
+    #setsid sudo -u "$user" -g "$group" auto-reraise "$service" &
+    #exec sudo -u "$user" -g "$group" auto-reraise "$service" &
+  fi
+}
+
+is_worker_running() {
+  local ppid line
+  ppid=$1
+  [ -n "$ppid"     ] || return 1
+  [ "$ppid" != "-" ] || return 1
+  # shellcheck disable=SC2009
+  line=`ps -A -o pid,command | grep "^ *$ppid " | grep auto-reraise`
+  [ -n "$line" ]
+}
+
+is_executable() {
+  local script permission
+  script=$1
+  set -- `/bin/ls -l "$script"`
+  permission=$1
+  case "$permission" in
+  ???x*) return 0 ;;  # return true if owner can execute
+  esac
+  [ -x "$script" ]
+}
+
+validate_script() {
+  local service script
+  service=$1
+  cmd=${2:-abort}
+  script="$RERAISE_DIR/$service"
+  if [ ! -e "$script" ]; then
+    $cmd "$service: script not found under '$RERAISE_DIR'."
+    return 1
+  elif [ ! -f "$script" ]; then
+    $cmd "$script: not a file."
+    return 1
+  elif ! is_executable "$script"; then
+    $cmd "$script: not executable."
+    return 1
+  else
+    return 0
+  fi
+}
+
+epoch2hhmmss() {
+  local epoch seconds hh mm ss
+  epoch=${1:-}
+  if [ -n "$epoch" ]; then
+    seconds=$(( `date +%s` - $epoch ))
+    if [ $seconds -ge 360000 ]; then
+      printf '%d-days\n' $(( $seconds / 3600 ))
+    else
+      #elapsed=`TZ=UTC date -d "@$seconds" +"%H:%M:%S"`         # linux
+      #elapsed=`TZ=UTC date -j -f "%s" "$seconds" +"%H:%M:%S"`  # bsd
+      hh=$(( $seconds / 3600 ))
+      mm=$(( ($seconds % 3600) / 60 ))
+      ss=$(( $seconds % 60 ))
+      printf '%02d:%02d:%02d\n' "$hh" "$mm" "$ss"
+    fi
+  fi
+}
+
+
+##
+## actions
+##
+
+do_help() {
+  local basename
+  basename=`basename "$0"`
+  cat <<EOF
+Usage: $basename [<option>] [<action> [<args>...]]
+  -h, --help        : print help message
+  --version         : print version
+
+Actions:
+  list              : list service scripts under \$RERAISE_DIR
+  status            : show status of service processes
+  start <service>   : start service process
+  stop <service>    : stop service process
+  restart <service> : restart (or start) service process
+  start-all         : start all service processes
+  stop-all          : stop all service processes
+  restart-all       : restart all service processes
+  clean             : remove remained files under \$RELEASE_PIDDIR
+
+Directories:
+  \$RERAISE_DIR      : $RERAISE_DIR
+  \$RERAISE_PIDDIR   : $RERAISE_PIDDIR
+
+Services (under \$RERAISE_DIR):
+EOF
+  (cd "$RERAISE_DIR"; /bin/ls -1) | sed 's/^/  /'
+}
+
+do_version() {
+  echo "$RELEASE"
+}
+
+do_list() {
+  checkdirs
+  (cd "$RERAISE_DIR"; /bin/ls -l) | awk 'NR > 1 {
+    printf("%-20s # user=%s, group=%s\n", $9, $3, $4);
+  }'
+}
+
+do_status() {
+  local service line pidfile status exitcode pid ppid epoch elapsed #pidlist
+  checkdirs
+  #pidlist=`ps -A -o pid,command | grep auto-reraise`
+  for service in `(/bin/ls -1 "$RERAISE_DIR"; /bin/ls -1 "$RERAISE_PIDDIR") | sort | uniq`; do
+    pidfile="$RERAISE_PIDDIR/$service"
+    if [ ! -f "$pidfile" ]; then
+      if is_executable "$RERAISE_DIR/$service"; then
+        _puts "$service" "not-running" ""
+      else
+        _puts "$service" "not-executable" ""
+      fi
+    else
+      line=`cat "$pidfile"`
+      # shellcheck disable=SC2086
+      set -- $line
+      status=${1:-}; exitcode=${2:-}; pid=${3:-}; ppid=${4:-}; epoch=${5:-}
+      elapsed=`epoch2hhmmss "$epoch"`
+      if [ -n "$ppid" ] && [ "$ppid" != '-' ]; then
+        #echo "$pidlist" | grep "^ *$ppid " >/dev/null || status="NOTRUN"
+        is_worker_running "$ppid" || status="NOTRUN"
+      fi
+      case "$status" in
+      START)  _puts "$service" "starting" "(ppid=$ppid, elapsed=$elapsed)";;
+      RUN)    _puts "$service" "running"  "(pid=$pid, ppid=$ppid, elapsed=$elapsed)";;
+      STOP)   _puts "$service" "stop"     "(will start soon; last-exitcode=$exitcode, elapsed=$elapsed)";;
+      ERROR)  _puts "$service" "ERROR"    "(exitcode=$exitcode, elapsed=$elapsed)";;
+      NOTRUN) _puts "$service" "seems-not-running" "(pidfile exists but process not found)";;
+      *)      _puts "$service" "UNKNOWN"  "(content='$line')";;
+      esac
+    fi
+  done
+}
+
+_puts() {
+  printf '%-18s %-15s %s\n' "$1" "$2" "$3"
+}
+
+do_start() {
+  local service pidfile ppid line
+  checkdirs
+  service=${1:-}
+  [ -n "$service" ] || abort "start: service name required."
+  validate_script "$service"
+  pidfile="$RERAISE_PIDDIR/$service"
+  if [ -f "$pidfile" ]; then
+    # shellcheck disable=SC2046
+    set -- `cat "$pidfile"`
+    ppid=${4:-}
+    if [ -n "$ppid" ] && [ "$ppid" != "-" ] && is_worker_running "$ppid"; then
+      abort "$service: service already running."
+    fi
+  fi
+  #exec auto-reraise "$RERAISE_DIR/$service" &
+  report "$service: start"
+  start_worker "$service"
+}
+
+do_stop() {
+  local service pidfile ppid
+  checkdirs
+  service=${1:-}
+  [ -n "$service" ] || abort "stop: service name required."
+  pidfile="$RERAISE_PIDDIR/$service"
+  if [ -f "$RERAISE_DIR/$service" ]; then
+    [ -e "$pidfile" ] || abort "$service: service not running."
+  else
+    [ -e "$pidfile" ] || abort "$service: no such service."
+  fi
+  # shellcheck disable=SC2046
+  set -- `cat "$pidfile"`
+  pid=${3:-}; ppid=${4:-}
+  if [ -z "$ppid" ] || [ "$ppid" = "-" ]; then
+    abort "$service: cannot detect worker PID from PID file ($pidfile)."
+  fi
+  if ! is_worker_running "$ppid"; then
+    abort "$service: service process not found (pidfile=$pidfile)"
+  fi
+  report "$service: stop    # (pid=$pid, worker-pid=$ppid)"
+  kill -TERM "$ppid"
+}
+
+do_restart() {
+  local service pidfile ppid _done
+  checkdirs
+  service=${1:-}
+  [ -n "$service" ] || abort "restart: service name required."
+  pidfile="$RERAISE_PIDDIR/$service"
+  [ -f "$RERAISE_DIR/$service" ] || abort "$service: no such service."
+  _done=""
+  if [ -f "$pidfile" ]; then
+    # shellcheck disable=SC2046
+    set -- `cat "$pidfile"`
+    ppid=${4:-}
+    if [ -n "$ppid" ] && [ "$ppid" != "-" ] && is_worker_running "$ppid"; then
+      report "$service: restart    # (worker-pid=$ppid)"
+      kill -HUP "$ppid"   # HUP is for restarting service process
+      _done="Y"
+    fi
+  fi
+  [ -n "$_done" ] || do_start "$service"
+}
+
+do_start_all() {
+  local service exitcode running pidfile ppid
+  checkdirs
+  exitcode=0
+  for service in `/bin/ls -1 "$RERAISE_DIR"`; do
+    if ! validate_script "$service" "error"; then
+      exitcode=1
+      continue
+    fi
+    running=""
+    pidfile="$RERAISE_PIDDIR/$service"
+    if [ -f "$pidfile" ]; then
+      # shellcheck disable=SC2046
+      set -- `cat "$pidfile"`
+      ppid=${4:-}
+      if [ -n "$ppid" ] && [ "$ppid" != "-" ] && is_worker_running "$ppid"; then
+        running="Y"
+      fi
+    fi
+    if [ -z "$running" ]; then
+      do_start "$service" || exitcode=1
+    fi
+  done
+  return $exitcode
+}
+
+do_stop_all() {
+  local exitcode service
+  checkdirs
+  exitcode=0
+  for service in `/bin/ls -1 "$RERAISE_DIR"`; do
+    do_stop "$service" || exitcode=1
+  done
+  return $exitcode
+}
+
+do_restart_all() {
+  local service
+  checkdirs
+  exitcode=0
+  for service in `(/bin/ls -1 "$RERAISE_DIR"; /bin/ls -1 "$RERAISE_PIDDIR") | sort | uniq`; do
+    if [ -f "$RERAISE_DIR/$service" ]; then
+      do_restart "$service" || exitcode=1
+    else
+      echo "$service: script not found under '$RERAISE_DIR'. ($RERAISE_DIR)" 1>&2
+      exitcode=1
+    fi
+  done
+  return $exitcode
+}
+
+do_clean() {
+  for service in `/bin/ls -1 "$RERAISE_PIDDIR"`; do
+    pidfile="$RERAISE_PIDDIR/$service"
+    # shellcheck disable=SC2046
+    set -- `cat "$pidfile"`
+    ppid=${4:-}
+    is_worker_running "$ppid" || /bin/rm "$pidfile"
+  done
+}
+
+
+##
+## main
+##
+
+action=${1:-"--help"}
+
+case "$action" in
+-h|--help)   do_help ;;
+#help)        do_help ;;
+--version)   do_version ;;
+#version)     do_version ;;
+list)        do_list ;;
+status)      do_status ;;
+start)       do_start "${2:-}" ;;
+stop)        do_stop "${2:-}" ;;
+restart)     do_restart "${2:-}" ;;
+start-all)   do_start_all ;;
+stop-all)    do_stop_all ;;
+restart-all) do_restart_all ;;
+clean)       do_clean ;;
+*)           abort "$action: unknown action." ;;
+esac
