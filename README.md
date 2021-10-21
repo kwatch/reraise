@@ -134,52 +134,6 @@ Normally it is no need to change this value, but you can change it to large valu
 
 
 
-Architecture
-------------
-
-### How `reraise start` command works
-
-1. `reraise start <service>` invokes `auto-reraise <service>` command (and exits).
-2. `auto-reraise <service>` invokes `$RERAISE_DIR/<service>` script (and not-exit).
-3. `$RERAISE_DIR/<service>` script executes service process.
-4. `auto-reraise` process creates `$RERAISE_PIDDIR/<service>` file (pid file).
-5. `auto-reraise` process waits for service process to exit with `wait` command.
-6. If service process exited, `auto-reraise` process invokes service process again automatically.
-7. Goto 4.
-
-(`auto-reraise` process itself is not supervised. This may be a weak point of Reraise compared to runit or daemontools.)
-
-
-### How `reraise stop` command works
-
-1. `reraise stop <service>` finds `$RERAISE_PIDDIR/<service>` file (pid file).
-2. `reraise` command gets `auto-reraise` process id (ppid) from that file.
-3. `reraise` command sends TERM signal to `auto-reraise` process (`kill -TERM $ppid`).
-4. `auto-reraise` process sends TERM signal to service process.
-5. `auto-reraise` process exits after removing `$RERAISE_PIDDIR/<service>` file.
-
-
-### How `reraise restart` command works
-
-1. `reraise restart <service>` finds `$RERAISE_PIDDIR/<service>` file (pid file).
-2. `reraise` command gets service process id (pid) from that file.
-3. `reraise` command sends TERM signal to service process (`kill -TERM $pid`).
-4. `auto-reraise` process invokes service process again automatically.
-<!--
-2. `reraise` command gets `auto-reraise` process id (ppid) from that file.
-3. `reraise` command sends HUP signal to `auto-reraise` process (`kill -HUP $ppid`).
-4. `auto-reraise` process sends TERM signal to service process.
-5. `auto-reraise` process invokes service process again automatically.
--->
-
-
-### How `auto-reraise` recognizes configuration in service starter script?
-
-1. `auto-reraise` executes `grep '^config_' $RERAISE_DIR/<service>`.
-2. `auto-reraise` evaluates the result with `eval`.
-
-
-
 Tips
 ----
 
@@ -229,6 +183,52 @@ root      277348  0.0  0.0   2524   676 ?        Ss   15:17   0:00 runsvdir -P /
   USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
   ubuntu    277066  0.3  3.3 289684 33408 pts/0    Sl   15:15   0:00 /usr/bin/ruby /usr/bin/god
   ```
+
+
+
+Architecture
+------------
+
+### How `reraise start` command works
+
+1. `reraise start <service>` invokes `auto-reraise <service>` command (and exits).
+2. `auto-reraise <service>` invokes `$RERAISE_DIR/<service>` script (and not-exit).
+3. `$RERAISE_DIR/<service>` script executes service process.
+4. `auto-reraise` process creates `$RERAISE_PIDDIR/<service>` file (pid file).
+5. `auto-reraise` process waits for service process to exit with `wait` command.
+6. If service process exited, `auto-reraise` process invokes service process again automatically.
+7. Goto 4.
+
+(`auto-reraise` process itself is not supervised. This may be a weak point of Reraise compared to runit or daemontools.)
+
+
+### How `reraise stop` command works
+
+1. `reraise stop <service>` finds `$RERAISE_PIDDIR/<service>` file (pid file).
+2. `reraise` command gets `auto-reraise` process id (ppid) from that file.
+3. `reraise` command sends TERM signal to `auto-reraise` process (`kill -TERM $ppid`).
+4. `auto-reraise` process sends TERM signal to service process.
+5. `auto-reraise` process exits after removing `$RERAISE_PIDDIR/<service>` file.
+
+
+### How `reraise restart` command works
+
+1. `reraise restart <service>` finds `$RERAISE_PIDDIR/<service>` file (pid file).
+2. `reraise` command gets service process id (pid) from that file.
+3. `reraise` command sends TERM signal to service process (`kill -TERM $pid`).
+4. `auto-reraise` process invokes service process again automatically.
+<!--
+2. `reraise` command gets `auto-reraise` process id (ppid) from that file.
+3. `reraise` command sends HUP signal to `auto-reraise` process (`kill -HUP $ppid`).
+4. `auto-reraise` process sends TERM signal to service process.
+5. `auto-reraise` process invokes service process again automatically.
+-->
+
+
+### How `auto-reraise` recognizes configuration in service starter script?
+
+1. `auto-reraise` executes `grep '^config_' $RERAISE_DIR/<service>`.
+2. `auto-reraise` evaluates the result with `eval`.
 
 
 
