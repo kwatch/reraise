@@ -348,7 +348,7 @@ stderr="$basedir/stderr.${port}.log"
 { echo ""; date +"-------------------- %F %T %Z"; } >>$stderr
 
 ## invoke service process (IMPORTANT: `exec` is necessary!)
-exec python3 -m http.server $port >>$stdout 2>>$stderr
+exec python3 -m http.server $port </dev/stderr >>$stdout 2>>$stderr
 HERE
 }
 

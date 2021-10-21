@@ -54,6 +54,10 @@ else
   #datecmd="date -j -f '%c'"      # error
 fi
 
+## close file descriptors
+exec 0<&-               # close stdin
+#exec 1>&- 2>&-         # close stdout and stdin
+
 ## main loop
 worker_pid=$$
 interval=0
