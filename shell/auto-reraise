@@ -40,7 +40,7 @@ trap '
     wait "$pid" 2>/dev/null || true
   fi
   grep ^ERROR "$pidfile" >/dev/null 2>&1 || /bin/rm -f "$pidfile"
-' 0 HUP                  # HUP is for restarting service process
+' 0 HUP                  # HUP was used to restart service process
 trap 'exit'   TERM       # not necessary in bash but necessary in sh
 trap 'exit 1' INT QUIT   # not work. why?
 

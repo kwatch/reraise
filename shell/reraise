@@ -255,8 +255,8 @@ _yield_restart() {
   local service pid ppid
   service="$1"; pid="$2"; ppid="$3"
   report "$service: restart    # (worker-pid=$ppid)"
-  #kill -TERM $pid
-  kill -HUP "$ppid"
+  kill -TERM $pid 2>/dev/null || true   # service process may not exist in interval
+  #kill -HUP "$ppid"    # instead of `kill -TERM $pid`
 }
 
 _foreach_running_service() {
