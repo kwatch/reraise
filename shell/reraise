@@ -128,13 +128,13 @@ epoch2hhmmss() {
 do_help() {
   local basename
   basename=`basename "$0"`
-  cat <<EOF
+  cat <<HERE
 Usage: $basename [<option>] [<action> [<args>...]]
   -h, --help           : print help message
   --version            : print version
 
 Actions:
-  list                 : list service scripts under \$RERAISE_DIR
+  list                 : list service names under \$RERAISE_DIR
   status               : show status of service processes
   start <service>...   : start service process ('*' means all services)
   stop <service>...    : stop service process ('*' means all services)
@@ -147,8 +147,17 @@ Directories:
   \$RERAISE_PIDDIR      : $RERAISE_PIDDIR
 
 Services (under \$RERAISE_DIR):
-EOF
+HERE
   (cd "$RERAISE_DIR"; /bin/ls -1) | sed 's/^/  /'
+  cat <<HERE
+
+Quick Tutorial:
+  $ $basename skeleton > \$RERAISE_DIR/http-8000
+  $ vi \$RERAISE_DIR/http-8000
+  $ chmod +x \$RERAISE_DIR/http-8000             # !!important!!
+  $ chown user1:group1 \$RERAISE_DIR/http-8000   # run service with other user
+  $ $basename start http-8000                     # or: $basename start '*'
+HERE
 }
 
 do_version() {
