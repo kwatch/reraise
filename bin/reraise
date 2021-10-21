@@ -9,7 +9,7 @@
 ##
 ## (Requires: `ps` and `sudo` commands)
 ##
-## $Release: 0.0.0 $
+## $Release: 1.0.0 $
 ## $License: public domain $
 ##
 
@@ -19,7 +19,7 @@
 set -eu
 
 # shellcheck disable=SC2016,SC2086
-RELEASE=`(x='$Release: 0.0.0 $'; set -- $x; echo $2)`
+RELEASE=`(x='$Release: 1.0.0 $'; set -- $x; echo $2)`
 
 
 ##
