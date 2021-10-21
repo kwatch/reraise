@@ -160,9 +160,9 @@ Memory Footprints
 
   ```terminal
   $ ps aux | awk 'NR==1||/runs[v]/'
-USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-root      278656  0.0  0.0   2372   672 ?        Ss   15:30   0:00 runsv app1
-root      277348  0.0  0.0   2524   676 ?        Ss   15:17   0:00 runsvdir -P /etc/service log: ...
+  USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+  root      278656  0.0  0.0   2372   672 ?        Ss   15:30   0:00 runsv app1
+  root      277348  0.0  0.0   2524   676 ?        Ss   15:17   0:00 runsvdir -P /etc/service log: ...
   ```
 
 * 'Supervisor' (python) consumes over 23MB, because it is implemented in Python.
@@ -225,7 +225,7 @@ Architecture
 -->
 
 
-### How `auto-reraise` recognizes configuration in service starter script?
+### How `auto-reraise` recognizes configuration in service starter script
 
 1. `auto-reraise` executes `grep '^config_' $RERAISE_DIR/<service>`.
 2. `auto-reraise` evaluates the result with `eval`.
