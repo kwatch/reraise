@@ -30,8 +30,8 @@ Install and Setup
 
 ```terminal
 ### download `reraise` and `auto-reraise` scripts
-$ curl -LO reraise http://bit.ly/reraise_sh
-$ curl -LO auto-reraise http://bit.ly/auto_reraise_sh
+$ curl -o reraise      -L http://bit.ly/reraise_
+$ curl -o auto-reraise -L http://bit.ly/auto-reraise_
 
 ### install scripts
 $ chmod a+x reraise auto-reraise
