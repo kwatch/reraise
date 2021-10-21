@@ -58,10 +58,10 @@ interval=0
 n=0            # how many times service process started successfully?
 i=0            # number of retry times
 while : ; do
-  unset config_startsecs
+  unset config_start_sec
   unset config_max_retry
   eval "`grep ^config_ \"$script\"`"
-  startsecs=${config_startsecs:-10}
+  start_sec=${config_start_sec:-10}
   max_retry=${config_max_retry:-2}
   #
   start_epoch=`date +'%s'`
@@ -81,7 +81,7 @@ while : ; do
   #
   end_epoch=`date +"%s"`
   sec=$(( $end_epoch - $start_epoch ))
-  if [ "$sec" -ge "$startsecs" ]; then
+  if [ "$sec" -ge "$start_sec" ]; then
     echo "STOP $exitcode - $worker_pid $end_epoch" > "$pidfile"
     i=0
     n=$(( $n + 1 ))
