@@ -140,6 +140,7 @@ Actions:
   stop <service>...    : stop service process ('*' means all services)
   restart <service>... : restart (or start) service process
   clean                : remove remained files under \$RELEASE_PIDDIR
+  skeleton             : generate example code of service starter script
 
 Directories:
   \$RERAISE_DIR         : $RERAISE_DIR
@@ -304,6 +305,42 @@ do_clean() {
   done
 }
 
+do_skeleton() {
+  cat <<'HERE'
+#!/bin/sh
+
+## @(#) simple http server
+
+set -eu
+abort() { echo "ERROR ($0): $1" 1>&2; exit 1; }
+
+## configure (affects to `auto-reraise` command behavior)
+config_start_sec=10  # regarded as error if service process exited within 10 seconds
+config_max_retry=2   # retry 2 times if service process failed to start (except 1st time)
+
+## detect port number from filename of starter script
+port=$(echo "$0" | sed 's/^.*-//')  # or: sed 's/.*-\([0-9][0-9]*\).*/\1/'
+[ -n "$port" ] || abort "failed to detect port number from file."
+
+## set environment variables
+export LC_ALL=en_US.UTF-8
+export TZ=UTC
+export PATH=/bin:/usr/bin:/usr/local/bin
+
+## change working directory
+basedir=/opt/app1
+cd $basedir
+
+## record current timestamp into stderr logfile
+stdout="$basedir/stdout.${port}.log"
+stderr="$basedir/stderr.${port}.log"
+{ echo ""; date +"-------------------- %F %T %Z"; } >>$stderr
+
+## invoke service process (IMPORTANT: `exec` is necessary!)
+exec python3 -m http.server $port >>$stdout 2>>$stderr
+HERE
+}
+
 
 ##
 ## main
@@ -322,6 +359,7 @@ start)       shift; do_start "$@" ;;
 stop)        shift; do_stop "$@" ;;
 restart)     shift; do_restart "$@" ;;
 clean)       do_clean ;;
+skeleton)    do_skeleton ;;
 -*)          abort "$action: unknown option." ;;
 *)           abort "$action: unknown action." ;;
 esac
