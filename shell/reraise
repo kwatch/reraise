@@ -50,14 +50,14 @@ start_worker() {
   # shellcheck disable=SC2046
   set -- `/bin/ls -l "$script"`
   user="$3"; group="$4"
-  if [ "`id -un`" = "$user" ] && [ "`id -gn`" = "$group" ]; then
+  #if [ "`id -un`" = "$user" ] && [ "`id -gn`" = "$group" ]; then
+  if [ "`id -un`" = "$user" ]; then
     auto-reraise "$service" &
     #setsid auto-reraise "$service" &     # linux ok, bsd not ok
-    #exec auto-reraise "$service" &
   else
-    sudo -u "$user" -g "$group" auto-reraise "$service" &
-    #setsid sudo -u "$user" -g "$group" auto-reraise "$service" &
-    #exec sudo -u "$user" -g "$group" auto-reraise "$service" &
+    #sudo -u "$user" -g "$group" auto-reraise "$service" &
+    sudo -u "$user" auto-reraise "$service" &
+    #setsid sudo -u "$user" auto-reraise "$service" &
   fi
 }
 
