@@ -13,7 +13,7 @@
 ##
 
 [ -n "${RERAISE_DIR:-}"    ] || export RERAISE_DIR="$HOME/reraise.d"
-[ -n "${RERAISE_PIDDIR:-}" ] || export RERAISE_PIDDIR="/var/run/reraise"
+[ -n "${RERAISE_PIDDIR:-}" ] || export RERAISE_PIDDIR="/var/tmp/reraise"
 
 set -eu
 
