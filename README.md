@@ -190,6 +190,48 @@ Tips
 
 
 
+Memory Footprints
+-----------------
+
+* Reraise consumes only 1.6MB memory per service process. Thanks to shell script.
+
+  ```terminal
+  $ reraise start http-8000
+  $ ps aux | awk 'NR==1||/rerais[e]/'
+  USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+  ubuntu    263236  0.0  0.1   2608  1688 ?        S    10:51   0:00 /bin/sh /usr/local/bin/auto-reraise http-8000
+  ```
+
+* 'runit' and 'daemontools' consume less than 1MB memroy, because they are implemented in C language.
+
+  ```terminal
+  $ ps aux | awk 'NR==1||/runs[v]/'
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root      278656  0.0  0.0   2372   672 ?        Ss   15:30   0:00 runsv app1
+root      277348  0.0  0.0   2524   676 ?        Ss   15:17   0:00 runsvdir -P /etc/service log: ...
+  ```
+
+* 'Supervisor' (python) consumes over 23MB, because it is implemented in Python.
+
+  ```terminal
+  $ sudo apt install supervisor
+  $ ps aux | awk 'NR==1||/superviso[r]/'
+  USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+  root      274693  0.1  2.3  31264 23380 ?        Ss   15:04   0:00 /usr/bin/python3 /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf
+  ```
+
+* 'God' (ruby) consumes over 33MB, because it is implemented in Ruby.
+
+  ```terminal
+  $ sudo apt install supervisor
+  $ god
+  $ ps aux | awk 'NR==1||/go[d]/'
+  USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+  ubuntu    277066  0.3  3.3 289684 33408 pts/0    Sl   15:15   0:00 /usr/bin/ruby /usr/bin/god
+  ```
+
+
+
 FAQ
 ---
 
