@@ -12,6 +12,8 @@
 ##
 ## (Requires: $RERAISE_DIR, $RERAISE_PIDDIR)
 ##
+## $License: public domain $
+##
 
 set -eu
 

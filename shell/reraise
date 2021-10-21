@@ -9,6 +9,8 @@
 ##
 ## (Requires: `ps` and `sudo` commands)
 ##
+## $License: public domain $
+##
 
 [ -n "${RERAISE_DIR:-}"    ] || export RERAISE_DIR="reraise.d"
 [ -n "${RERAISE_PIDDIR:-}" ] || export RERAISE_PIDDIR="/var/run/reraise"
